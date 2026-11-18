@@ -51,13 +51,28 @@ CREATE TABLE IF NOT EXISTS board_events (
 """
 
 
+class StoredEventError(TypeError, ValueError):
+    """A stored record does not have the shape the repository wrote.
+
+    It is a ValueError (the stored value is wrong) and a TypeError (the value has the
+    wrong type), so callers that caught ValueError keep working.
+    """
+
+
+# Error messages, named once so that every raise states which rule refused the value.
+FILE_DATABASE_REQUIRED = "SQLiteBoardRepository requires a file-backed database"
+UNKNOWN_PORT_CODE = "database contains an unknown port code"
+INVALID_PAYLOAD = "database contains an invalid event payload"
+UNKNOWN_EVENT_TYPE = "database contains unknown event type: {}"
+
+
 class SQLiteBoardRepository:
     """A file-backed repository; each operation opens and closes its own connection."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = str(path)
         if self._path == ":memory:":
-            raise ValueError("SQLiteBoardRepository requires a file-backed database")
+            raise ValueError(FILE_DATABASE_REQUIRED)
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(_SCHEMA)
@@ -174,7 +189,7 @@ class SQLiteBoardRepository:
     def _decode_tile(row: sqlite3.Row) -> Tile:
         codes = cast("str", row["base_ports"])
         if any(code not in _CODE_PORTS for code in codes):
-            raise ValueError("database contains an unknown port code")
+            raise StoredEventError(UNKNOWN_PORT_CODE)
         return Tile(
             frozenset(_CODE_PORTS[code] for code in codes),
             Role(cast("str", row["role"])),
@@ -199,7 +214,7 @@ class SQLiteBoardRepository:
     def _decode_event(event_type: str, payload: str) -> Event:
         data = json.loads(payload)
         if not isinstance(data, dict):
-            raise ValueError("database contains an invalid event payload")
+            raise StoredEventError(INVALID_PAYLOAD)
         if event_type == "tile_rotated":
             return TileRotated(
                 str(data["board_id"]),
@@ -209,4 +224,4 @@ class SQLiteBoardRepository:
             )
         if event_type == "board_solved":
             return BoardSolved(str(data["board_id"]), data["moves_used"])
-        raise ValueError(f"database contains unknown event type: {event_type}")
+        raise StoredEventError(UNKNOWN_EVENT_TYPE.format(event_type))

@@ -13,6 +13,28 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
+QUARTER_TURNS = 4  # a full turn
+
+# Error messages, named once so that every raise states which rule refused the value.
+CELL_NOT_WHOLE = "row and column are non-negative integers"
+ORIENTATION_RANGE = "an orientation is 0, 1, 2 or 3 quarter-turns"
+TILE_WITHOUT_PORT = "a tile has at least one port"
+PORT_NOT_DIRECTION = "ports are north, east, south or west"
+TILE_WITHOUT_ROLE = "a tile needs a role and an orientation"
+BOARD_WITHOUT_IDENTITY = "a board needs an identity"
+BOARD_TOO_SMALL = "a board has at least one row and one column"
+BUDGET_NOT_POSITIVE = "the move budget is a positive integer"
+MOVES_OUT_OF_RANGE = "moves used lie between zero and the budget"
+BOARD_NOT_CELL_MAP = "a board maps cells to tiles"
+TILE_OFF_BOARD = "every tile lies on the board"
+SOURCE_COUNT = "a board has exactly one source"
+LAMP_MISSING = "a board has at least one lamp"
+CELL_REQUIRED = "a cell is required"
+NO_TILE = "there is no tile at that cell"
+TILE_FIXED = "source and lamp tiles are fixed"
+BOARD_FINISHED = "the board is {}"
+
+
 class Port(Enum):
     NORTH = "north"
     EAST = "east"
@@ -72,7 +94,7 @@ class Cell:
     def __post_init__(self) -> None:
         for value in (self.row, self.col):
             if type(value) is not int or value < 0:
-                raise ValueError("row and column are non-negative integers")
+                raise ValueError(CELL_NOT_WHOLE)
 
     def towards(self, port: Port) -> tuple[int, int]:
         d_row, d_col = port.step
@@ -86,11 +108,11 @@ class Orientation:
     quarter_turns: int = 0
 
     def __post_init__(self) -> None:
-        if type(self.quarter_turns) is not int or not 0 <= self.quarter_turns <= 3:
-            raise ValueError("an orientation is 0, 1, 2 or 3 quarter-turns")
+        if type(self.quarter_turns) is not int or not 0 <= self.quarter_turns < QUARTER_TURNS:
+            raise ValueError(ORIENTATION_RANGE)
 
     def turned(self) -> Orientation:
-        return Orientation((self.quarter_turns + 1) % 4)
+        return Orientation((self.quarter_turns + 1) % QUARTER_TURNS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +125,11 @@ class Tile:
 
     def __post_init__(self) -> None:
         if not isinstance(self.base_ports, frozenset) or not self.base_ports:
-            raise ValueError("a tile has at least one port")
+            raise ValueError(TILE_WITHOUT_PORT)
         if any(not isinstance(port, Port) for port in self.base_ports):
-            raise TypeError("ports are north, east, south or west")
+            raise TypeError(PORT_NOT_DIRECTION)
         if not isinstance(self.role, Role) or not isinstance(self.orientation, Orientation):
-            raise TypeError("a tile needs a role and an orientation")
+            raise TypeError(TILE_WITHOUT_ROLE)
 
     @property
     def ports(self) -> frozenset[Port]:
@@ -174,26 +196,32 @@ class Board:
     moves_used: int = 0
 
     def __post_init__(self) -> None:
+        self._check_shape()
+        self.tiles = dict(self.tiles)
+        self._check_tiles()
+
+    def _check_shape(self) -> None:
         if not self.board_id:
-            raise ValueError("a board needs an identity")
+            raise ValueError(BOARD_WITHOUT_IDENTITY)
         for size in (self.rows, self.cols):
             if type(size) is not int or size < 1:
-                raise ValueError("a board has at least one row and one column")
+                raise ValueError(BOARD_TOO_SMALL)
         if type(self.move_budget) is not int or self.move_budget < 1:
-            raise ValueError("the move budget is a positive integer")
+            raise ValueError(BUDGET_NOT_POSITIVE)
         if type(self.moves_used) is not int or not 0 <= self.moves_used <= self.move_budget:
-            raise ValueError("moves used lie between zero and the budget")
-        self.tiles = dict(self.tiles)
+            raise ValueError(MOVES_OUT_OF_RANGE)
+
+    def _check_tiles(self) -> None:
         for cell, tile in self.tiles.items():
             if not isinstance(cell, Cell) or not isinstance(tile, Tile):
-                raise TypeError("a board maps cells to tiles")
+                raise TypeError(BOARD_NOT_CELL_MAP)
             if cell.row >= self.rows or cell.col >= self.cols:
-                raise ValueError("every tile lies on the board")
+                raise ValueError(TILE_OFF_BOARD)
         roles = [tile.role for tile in self.tiles.values()]
         if roles.count(Role.SOURCE) != 1:
-            raise ValueError("a board has exactly one source")
+            raise ValueError(SOURCE_COUNT)
         if roles.count(Role.LAMP) < 1:
-            raise ValueError("a board has at least one lamp")
+            raise ValueError(LAMP_MISSING)
 
     @property
     def powered(self) -> frozenset[Cell]:
@@ -217,14 +245,14 @@ class Board:
         Nothing changes when the board is finished or the command is invalid.
         """
         if self.state is not BoardState.ACTIVE:
-            raise BoardFinishedError(f"the board is {self.state.value}")
+            raise BoardFinishedError(BOARD_FINISHED.format(self.state.value))
         if not isinstance(cell, Cell):
-            raise InvalidRotationError("a cell is required")
+            raise InvalidRotationError(CELL_REQUIRED)
         tile = self.tiles.get(cell)
         if tile is None:
-            raise InvalidRotationError("there is no tile at that cell")
+            raise InvalidRotationError(NO_TILE)
         if tile.role is not Role.WIRE:
-            raise InvalidRotationError("source and lamp tiles are fixed")
+            raise InvalidRotationError(TILE_FIXED)
         turned = tile.rotated()
         self.tiles[cell] = turned
         self.moves_used += 1
@@ -237,13 +265,13 @@ class Board:
 
 
 def tile(ports: str, role: Role = Role.WIRE, turns: int = 0) -> Tile:
-    """Shorthand: tile("ne") is a wire with base ports north and east."""
+    """Build a tile from port letters: "ne" gives a wire with base ports north and east."""
     letters = {"n": Port.NORTH, "e": Port.EAST, "s": Port.SOUTH, "w": Port.WEST}
     return Tile(frozenset(letters[letter] for letter in ports), role, Orientation(turns))
 
 
 def starter_board(board_id: str = "starter") -> Board:
-    """The first fixed board: 3 x 3, one source, two lamps, six moves.
+    """Return the first fixed board: 3 x 3, one source, two lamps, six moves.
 
     The source at the top left opens east. One lamp sits on the right edge and opens
     north; the other at the bottom left opens east. Four rotations solve it (the tests
