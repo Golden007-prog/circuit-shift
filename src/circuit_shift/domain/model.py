@@ -1,3 +1,4 @@
+# Copyright 2026 TM-59
 """Circuit Routing: tiles, the board aggregate, its events and connectivity.
 
 Standard library only. A graph puzzle, not a simulation of electrical current.

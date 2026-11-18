@@ -1,3 +1,4 @@
+# Copyright 2026 TM-59
 """The health route."""
 
 from typing import Literal

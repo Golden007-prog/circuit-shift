@@ -1,3 +1,4 @@
+# Copyright 2026 TM-59
 """The SQLite repository: persistence and atomic saves."""
 
 import sqlite3

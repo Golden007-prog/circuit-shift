@@ -1,3 +1,4 @@
+# Copyright 2026 TM-59
 """Circuit Routing domain: standard library only."""
 
 from circuit_shift.domain.model import (

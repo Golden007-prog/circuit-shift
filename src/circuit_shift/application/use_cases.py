@@ -1,3 +1,4 @@
+# Copyright 2026 TM-59
 """Framework-independent board use cases."""
 
 from typing import TYPE_CHECKING
