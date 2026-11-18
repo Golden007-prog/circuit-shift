@@ -13,14 +13,14 @@
 <circle cx="145.0" cy="107.0" r="5" fill="#e6a800"/>
 <rect x="186" y="70" width="74" height="74" fill="#f4f4f4" stroke="#cccccc"/>
 <rect x="30" y="148" width="74" height="74" fill="#f4f4f4" stroke="#cccccc"/>
-<line x1="67.0" y1="185.0" x2="104.0" y2="185.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
 <line x1="67.0" y1="185.0" x2="67.0" y2="148.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
+<line x1="67.0" y1="185.0" x2="104.0" y2="185.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
 <circle cx="67.0" cy="185.0" r="5" fill="#e6a800"/>
 <rect x="108" y="148" width="74" height="74" fill="#f4f4f4" stroke="#cccccc"/>
-<line x1="145.0" y1="185.0" x2="145.0" y2="222.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
 <line x1="145.0" y1="185.0" x2="108.0" y2="185.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
-<line x1="145.0" y1="185.0" x2="182.0" y2="185.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
 <line x1="145.0" y1="185.0" x2="145.0" y2="148.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
+<line x1="145.0" y1="185.0" x2="145.0" y2="222.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
+<line x1="145.0" y1="185.0" x2="182.0" y2="185.0" stroke="#e6a800" stroke-width="8" stroke-linecap="round"/>
 <circle cx="145.0" cy="185.0" r="5" fill="#e6a800"/>
 <rect x="186" y="148" width="74" height="74" fill="#f4f4f4" stroke="#cccccc"/>
 <line x1="223.0" y1="185.0" x2="223.0" y2="148.0" stroke="#777777" stroke-width="8" stroke-linecap="round"/>

@@ -1,18 +1,20 @@
+# Copyright 2026 TM-59
 """Pure rules of Circuit Routing. No web framework is touched here."""
 
 import copy
 from itertools import product
+from typing import Any, cast
 
 import pytest
 
 from circuit_shift.domain import (
     Board,
-    BoardFinished,
+    BoardFinishedError,
     BoardSolved,
     BoardState,
     Cell,
     Connectivity,
-    InvalidRotation,
+    InvalidRotationError,
     Orientation,
     Port,
     Role,
@@ -21,8 +23,23 @@ from circuit_shift.domain import (
     starter_board,
     tile,
 )
+from circuit_shift.domain.model import (
+    BOARD_TOO_SMALL,
+    BOARD_WITHOUT_IDENTITY,
+    BUDGET_NOT_POSITIVE,
+    CELL_NOT_WHOLE,
+    LAMP_MISSING,
+    MOVES_OUT_OF_RANGE,
+    ORIENTATION_RANGE,
+    SOURCE_COUNT,
+    TILE_OFF_BOARD,
+    TILE_WITHOUT_PORT,
+)
 
 N, E, S, W = Port.NORTH, Port.EAST, Port.SOUTH, Port.WEST
+
+STARTER_FEWEST_ROTATIONS = 4  # the starter board needs four rotations at least
+STARTER_WINS_WITHIN_BUDGET = 7  # ways to win the starter board within its budget
 
 
 def state_of(board: Board) -> BoardState:
@@ -31,54 +48,65 @@ def state_of(board: Board) -> BoardState:
 
 
 def row_board(*tiles: Tile, budget: int = 3) -> Board:
+    """Return a one-row board of the given tiles with `budget` moves."""
     return Board("row", 1, len(tiles), {Cell(0, i): t for i, t in enumerate(tiles)}, budget)
 
 
-def test_REQ_TILE_clockwise_and_opposite_ports() -> None:
+def test_req_tile_clockwise_and_opposite_ports() -> None:
+    """REQ-TILE: clockwise and opposite sides."""
     assert [N.clockwise, E.clockwise, S.clockwise, W.clockwise] == [E, S, W, N]
     assert [N.opposite, E.opposite, S.opposite, W.opposite] == [S, W, N, E]
-    assert Cell(1, 1).towards(N) == (0, 1) and Cell(1, 1).towards(W) == (1, 0)
+    assert Cell(1, 1).towards(N) == (0, 1)
+    assert Cell(1, 1).towards(W) == (1, 0)
 
 
 @pytest.mark.parametrize(
     ("turns", "expected"),
     [(0, {N, E}), (1, {E, S}), (2, {S, W}), (3, {W, N})],
 )
-def test_REQ_TILE_all_four_orientations(turns: int, expected: set[Port]) -> None:
+def test_req_tile_all_four_orientations(turns: int, expected: set[Port]) -> None:
+    """REQ-TILE: each orientation turns the base ports as documented."""
     assert tile("ne", turns=turns).ports == expected
 
 
-def test_REQ_TILE_rotation_gives_a_new_value_and_wraps_after_four() -> None:
+def test_req_tile_rotation_gives_a_new_value_and_wraps_after_four() -> None:
+    """REQ-TILE: rotation returns a new frozen value and wraps after four."""
     corner = tile("ne")
     turned = corner.rotated()
-    assert corner.orientation == Orientation(0) and turned.orientation == Orientation(1)
+    assert corner.orientation == Orientation(0)
+    assert turned.orientation == Orientation(1)
     assert turned.rotated().rotated().rotated() == corner
+    field = "role"
     with pytest.raises(AttributeError):
-        corner.role = Role.LAMP  # type: ignore[misc]
+        setattr(corner, field, Role.LAMP)  # a frozen value cannot be reassigned
     assert tile("ew").rotated().rotated().ports == tile("ew").ports  # symmetric after two
 
 
 @pytest.mark.parametrize("bad", [-1, 4, 1.0, "1", None])
-def test_REQ_TILE_orientation_is_zero_to_three(bad: object) -> None:
-    with pytest.raises(ValueError):
-        Orientation(bad)  # type: ignore[arg-type]
+def test_req_tile_orientation_is_zero_to_three(bad: object) -> None:
+    """REQ-TILE: orientations other than 0 to 3 are refused."""
+    with pytest.raises(ValueError, match=ORIENTATION_RANGE):
+        Orientation(cast("int", bad))
 
 
-def test_REQ_TILE_values_reject_malformed_input() -> None:
+def test_req_tile_values_reject_malformed_input() -> None:
+    """REQ-TILE: malformed cells and tiles are refused."""
     for bad in ((-1, 0), (0, -1), (0.0, 0), ("0", 0)):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=CELL_NOT_WHOLE):
             Cell(*bad)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=TILE_WITHOUT_PORT):
         Tile(frozenset())
     with pytest.raises(TypeError):
-        Tile(frozenset({"north"}))  # type: ignore[arg-type]
+        Tile(cast("frozenset[Port]", frozenset({"north"})))
     with pytest.raises(TypeError):
-        Tile(frozenset({N}), "wire")  # type: ignore[arg-type]
+        Tile(frozenset({N}), cast("Role", "wire"))
 
 
-def test_REQ_CONNECT_documented_one_row_example() -> None:
+def test_req_connect_documented_one_row_example() -> None:
+    """REQ-CONNECT: the documented one-row example powers as shown."""
     board = row_board(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP))
-    assert board.powered == {Cell(0, 0)} and board.state is BoardState.ACTIVE
+    assert board.powered == {Cell(0, 0)}
+    assert board.state is BoardState.ACTIVE
     events = board.rotate(Cell(0, 1))
     assert board.powered == {Cell(0, 0), Cell(0, 1), Cell(0, 2)}
     assert events == (
@@ -88,14 +116,16 @@ def test_REQ_CONNECT_documented_one_row_example() -> None:
     assert state_of(board) is BoardState.SOLVED
 
 
-def test_REQ_CONNECT_ports_must_be_reciprocal() -> None:
+def test_req_connect_ports_must_be_reciprocal() -> None:
     # a source opening east next to a wire opening east only: not a connection
+    """REQ-CONNECT: power passes only through facing ports."""
     board = row_board(tile("e", Role.SOURCE), tile("e"), tile("w", Role.LAMP))
     assert board.powered == {Cell(0, 0)}
 
 
-def test_REQ_CONNECT_borders_do_not_wrap() -> None:
+def test_req_connect_borders_do_not_wrap() -> None:
     # the lamp at the far right opens east, the source at the far left opens west
+    """REQ-CONNECT: ports at the border lead nowhere."""
     board = row_board(tile("w", Role.SOURCE), tile("ew"), tile("e", Role.LAMP))
     assert board.powered == {Cell(0, 0)}
     column = Board(
@@ -104,7 +134,8 @@ def test_REQ_CONNECT_borders_do_not_wrap() -> None:
     assert column.powered == {Cell(0, 0)}
 
 
-def test_REQ_CONNECT_cycles_and_dangling_ports_are_allowed() -> None:
+def test_req_connect_cycles_and_dangling_ports_are_allowed() -> None:
+    """REQ-CONNECT: loops and open ports are allowed."""
     tiles = {
         Cell(0, 0): tile("es", Role.SOURCE),
         Cell(0, 1): tile("sw"),
@@ -123,111 +154,146 @@ def test_REQ_CONNECT_cycles_and_dangling_ports_are_allowed() -> None:
     assert Connectivity.powered(island) == {Cell(0, 0)}  # a connected pair away from the source
 
 
-def test_REQ_CONNECT_every_lamp_must_be_reached() -> None:
+def test_req_connect_every_lamp_must_be_reached() -> None:
+    """REQ-CONNECT: a board is solved only when every lamp is reached."""
     board = row_board(
         tile("e", Role.LAMP), tile("ew", Role.SOURCE), tile("ns"), tile("w", Role.LAMP)
     )
-    assert board.powered == {Cell(0, 0), Cell(0, 1)} and board.state is BoardState.ACTIVE
+    assert board.powered == {Cell(0, 0), Cell(0, 1)}
+    assert board.state is BoardState.ACTIVE
     board.rotate(Cell(0, 2))
     assert state_of(board) is BoardState.SOLVED
 
 
-def test_REQ_BOARD_creation_rejects_malformed_boards() -> None:
+def test_req_board_creation_rejects_malformed_boards() -> None:
+    """REQ-BOARD: malformed boards are refused."""
     source, lamp, wire = tile("e", Role.SOURCE), tile("w", Role.LAMP), tile("ew")
     good = {Cell(0, 0): source, Cell(0, 1): lamp}
     for kwargs in (
-        dict(board_id="", rows=1, cols=2, tiles=good, move_budget=1),
-        dict(board_id="b", rows=0, cols=2, tiles=good, move_budget=1),
-        dict(board_id="b", rows=1, cols=2, tiles=good, move_budget=0),
-        dict(board_id="b", rows=1, cols=2, tiles=good, move_budget=-3),
-        dict(board_id="b", rows=1, cols=1, tiles=good, move_budget=1),  # lamp off the board
-        dict(
-            board_id="b", rows=1, cols=2, tiles={Cell(0, 0): wire, Cell(0, 1): lamp}, move_budget=1
-        ),
-        dict(
-            board_id="b",
-            rows=1,
-            cols=2,
-            tiles={Cell(0, 0): source, Cell(0, 1): source},
-            move_budget=1,
-        ),
-        dict(
-            board_id="b",
-            rows=1,
-            cols=2,
-            tiles={Cell(0, 0): source, Cell(0, 1): wire},
-            move_budget=1,
-        ),
-        dict(board_id="b", rows=1, cols=2, tiles=good, move_budget=1, moves_used=2),
+        {"board_id": "", "rows": 1, "cols": 2, "tiles": good, "move_budget": 1},
+        {"board_id": "b", "rows": 0, "cols": 2, "tiles": good, "move_budget": 1},
+        {"board_id": "b", "rows": 1, "cols": 2, "tiles": good, "move_budget": 0},
+        {"board_id": "b", "rows": 1, "cols": 2, "tiles": good, "move_budget": -3},
+        {
+            "board_id": "b",
+            "rows": 1,
+            "cols": 1,
+            "tiles": good,
+            "move_budget": 1,
+        },  # lamp off the board
+        {
+            "board_id": "b",
+            "rows": 1,
+            "cols": 2,
+            "tiles": {Cell(0, 0): wire, Cell(0, 1): lamp},
+            "move_budget": 1,
+        },
+        {
+            "board_id": "b",
+            "rows": 1,
+            "cols": 2,
+            "tiles": {Cell(0, 0): source, Cell(0, 1): source},
+            "move_budget": 1,
+        },
+        {
+            "board_id": "b",
+            "rows": 1,
+            "cols": 2,
+            "tiles": {Cell(0, 0): source, Cell(0, 1): wire},
+            "move_budget": 1,
+        },
+        {"board_id": "b", "rows": 1, "cols": 2, "tiles": good, "move_budget": 1, "moves_used": 2},
     ):
-        with pytest.raises(ValueError):
-            Board(**kwargs)  # type: ignore[arg-type]
+        shape_rules = (
+            BOARD_WITHOUT_IDENTITY,
+            BOARD_TOO_SMALL,
+            BUDGET_NOT_POSITIVE,
+            MOVES_OUT_OF_RANGE,
+            TILE_OFF_BOARD,
+            SOURCE_COUNT,
+            LAMP_MISSING,
+        )
+        with pytest.raises(ValueError, match="|".join(shape_rules)):
+            Board(**cast("dict[str, Any]", kwargs))
     with pytest.raises(TypeError):
-        Board("b", 1, 2, {(0, 0): source, Cell(0, 1): lamp}, 1)  # type: ignore[dict-item]
+        Board("b", 1, 2, cast("dict[Cell, Tile]", {(0, 0): source, Cell(0, 1): lamp}), 1)
 
 
-def test_REQ_BOARD_a_board_can_start_solved_and_then_rejects_rotation() -> None:
+def test_req_board_a_board_can_start_solved_and_then_rejects_rotation() -> None:
+    """REQ-BOARD: a board may start solved and then refuses rotation."""
     board = row_board(tile("e", Role.SOURCE), tile("ew"), tile("w", Role.LAMP))
     assert state_of(board) is BoardState.SOLVED
-    with pytest.raises(BoardFinished):
+    with pytest.raises(BoardFinishedError):
         board.rotate(Cell(0, 1))
     assert board.moves_used == 0
 
 
-def test_REQ_BOARD_symmetric_rotation_still_costs_a_move() -> None:
+def test_req_board_symmetric_rotation_still_costs_a_move() -> None:
+    """REQ-BOARD: a rotation that changes nothing still costs a move."""
     board = row_board(tile("e", Role.SOURCE), tile("nesw"), tile("n", Role.LAMP), budget=2)
     (event,) = board.rotate(Cell(0, 1))
-    assert isinstance(event, TileRotated) and event.move == 1
-    assert board.moves_used == 1 and board.tiles[Cell(0, 1)].ports == {N, E, S, W}
+    assert isinstance(event, TileRotated)
+    assert event.move == 1
+    assert board.moves_used == 1
+    assert board.tiles[Cell(0, 1)].ports == {N, E, S, W}
 
 
-def test_REQ_BOARD_solving_on_the_last_move_wins() -> None:
+def test_req_board_solving_on_the_last_move_wins() -> None:
+    """REQ-BOARD: solving on the last move wins."""
     board = row_board(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP), budget=1)
     events = board.rotate(Cell(0, 1))
     assert board.moves_used == board.move_budget
-    assert state_of(board) is BoardState.SOLVED and isinstance(events[-1], BoardSolved)
+    assert state_of(board) is BoardState.SOLVED
+    assert isinstance(events[-1], BoardSolved)
 
 
-def test_REQ_BOARD_running_out_of_moves_exhausts_and_rejects() -> None:
+def test_req_board_running_out_of_moves_exhausts_and_rejects() -> None:
+    """REQ-BOARD: running out of moves exhausts the board, which then refuses."""
     board = row_board(tile("e", Role.SOURCE), tile("n"), tile("w", Role.LAMP), budget=2)
     assert len(board.rotate(Cell(0, 1))) == 1  # one event: not solved
     board.rotate(Cell(0, 1))
     assert board.state is BoardState.EXHAUSTED
     before = copy.deepcopy(board)
-    with pytest.raises(BoardFinished):
+    with pytest.raises(BoardFinishedError):
         board.rotate(Cell(0, 1))
     assert board == before
 
 
-def test_REQ_BOARD_invalid_commands_cost_nothing() -> None:
+def test_req_board_invalid_commands_cost_nothing() -> None:
+    """REQ-BOARD: invalid rotations cost no move."""
     board = starter_board()
     before = copy.deepcopy(board)
     for cell in (Cell(0, 0), Cell(1, 2), Cell(2, 0), Cell(5, 5)):  # source, lamps, off the board
-        with pytest.raises(InvalidRotation):
+        with pytest.raises(InvalidRotationError):
             board.rotate(cell)
     sparse = Board(
         "sparse", 1, 3, {Cell(0, 0): tile("e", Role.SOURCE), Cell(0, 2): tile("w", Role.LAMP)}, 2
     )
-    with pytest.raises(InvalidRotation):
+    with pytest.raises(InvalidRotationError):
         sparse.rotate(Cell(0, 1))  # an empty cell
-    with pytest.raises(InvalidRotation):
-        board.rotate((0, 1))  # type: ignore[arg-type]
-    assert board == before and sparse.moves_used == 0
+    with pytest.raises(InvalidRotationError):
+        board.rotate(cast("Cell", (0, 1)))
+    assert board == before
+    assert sparse.moves_used == 0
 
 
-def test_REQ_BOARD_solved_event_only_on_the_first_transition() -> None:
+def test_req_board_solved_event_only_on_the_first_transition() -> None:
+    """REQ-BOARD: BoardSolved is emitted once, on the first transition."""
     board = starter_board()
     seen: list[object] = []
     for cell in (Cell(0, 1), Cell(0, 2), Cell(0, 2), Cell(1, 1)):
         seen.extend(board.rotate(cell))
     assert [type(event) for event in seen].count(BoardSolved) == 1
-    assert seen[-1] == BoardSolved("starter", 4) and board.state is BoardState.SOLVED
+    assert seen[-1] == BoardSolved("starter", 4)
+    assert board.state is BoardState.SOLVED
     assert [event.move for event in seen if isinstance(event, TileRotated)] == [1, 2, 3, 4]
 
 
-def test_REQ_BOARD_starter_needs_four_rotations_found_by_search() -> None:
+def test_req_board_starter_needs_four_rotations_found_by_search() -> None:
+    """REQ-BOARD: an exhaustive search finds that the starter board needs four rotations."""
     board = starter_board()
-    assert board.state is BoardState.ACTIVE and board.powered == {Cell(0, 0)}
+    assert board.state is BoardState.ACTIVE
+    assert board.powered == {Cell(0, 0)}
     assert (board.rows, board.cols, board.move_budget, len(board.lamps)) == (3, 3, 6, 2)
     wires = [cell for cell, t in board.tiles.items() if t.role is Role.WIRE]
     costs = []
@@ -238,12 +304,13 @@ def test_REQ_BOARD_starter_needs_four_rotations_found_by_search() -> None:
                 tiles[cell] = tiles[cell].rotated()
         if board.lamps <= Connectivity.powered(tiles):
             costs.append(sum(turns))
-    assert min(costs) == 4
-    assert sum(cost <= board.move_budget for cost in costs) == 7  # ways to win within the budget
+    assert min(costs) == STARTER_FEWEST_ROTATIONS
+    assert sum(cost <= board.move_budget for cost in costs) == STARTER_WINS_WITHIN_BUDGET
     assert starter_board("other").board_id == "other"
 
 
-def test_REQ_BOARD_same_commands_give_the_same_board() -> None:
+def test_req_board_same_commands_give_the_same_board() -> None:
+    """REQ-BOARD: the same rotations always give the same board."""
     plays = []
     for _ in range(2):
         board = starter_board()

@@ -1,3 +1,6 @@
+# Copyright 2026 TM-59
+"""SQLite adapter for the application board repository port."""
+
 import json
 import sqlite3
 from pathlib import Path
@@ -51,18 +54,35 @@ CREATE TABLE IF NOT EXISTS board_events (
 """
 
 
+class StoredEventError(TypeError, ValueError):
+    """A stored record does not have the shape the repository wrote.
+
+    It is a ValueError (the stored value is wrong) and a TypeError (the value has the
+    wrong type), so callers that caught ValueError keep working.
+    """
+
+
+# Error messages, named once so that every raise states which rule refused the value.
+FILE_DATABASE_REQUIRED = "SQLiteBoardRepository requires a file-backed database"
+UNKNOWN_PORT_CODE = "database contains an unknown port code"
+INVALID_PAYLOAD = "database contains an invalid event payload"
+UNKNOWN_EVENT_TYPE = "database contains unknown event type: {}"
+
+
 class SQLiteBoardRepository:
     """A file-backed repository; each operation opens and closes its own connection."""
 
     def __init__(self, path: str | Path) -> None:
+        """Open (and create if needed) the database at `path`."""
         self._path = str(path)
         if self._path == ":memory:":
-            raise ValueError("SQLiteBoardRepository requires a file-backed database")
+            raise ValueError(FILE_DATABASE_REQUIRED)
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(_SCHEMA)
 
     def add(self, board: Board) -> None:
+        """Insert the board and its tiles."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
@@ -73,6 +93,7 @@ class SQLiteBoardRepository:
             self._insert_tiles(connection, board)
 
     def get(self, board_id: str) -> BoardRecord | None:
+        """Return the stored board and its events, or None."""
         with self._connect() as connection:
             connection.execute("BEGIN")
             row = connection.execute(
@@ -83,7 +104,7 @@ class SQLiteBoardRepository:
             if row is None:
                 return None
             tiles = {
-                Cell(cast(int, tile_row["row"]), cast(int, tile_row["col"])): self._decode_tile(
+                Cell(cast("int", tile_row["row"]), cast("int", tile_row["col"])): self._decode_tile(
                     tile_row
                 )
                 for tile_row in connection.execute(
@@ -93,15 +114,15 @@ class SQLiteBoardRepository:
                 )
             }
             board = Board(
-                cast(str, row["board_id"]),
-                cast(int, row["rows"]),
-                cast(int, row["cols"]),
+                cast("str", row["board_id"]),
+                cast("int", row["rows"]),
+                cast("int", row["cols"]),
                 tiles,
-                cast(int, row["move_budget"]),
-                cast(int, row["moves_used"]),
+                cast("int", row["move_budget"]),
+                cast("int", row["moves_used"]),
             )
             events = tuple(
-                self._decode_event(cast(str, event["event_type"]), cast(str, event["payload"]))
+                self._decode_event(cast("str", event["event_type"]), cast("str", event["payload"]))
                 for event in connection.execute(
                     """SELECT event_type, payload FROM board_events
                        WHERE board_id = ? ORDER BY event_number""",
@@ -111,6 +132,7 @@ class SQLiteBoardRepository:
             return BoardRecord(board, events)
 
     def save(self, board: Board, events: tuple[Event, ...], expected_moves: int) -> bool:
+        """Update the board and append events atomically if no move was saved since."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             changed = connection.execute(
@@ -130,7 +152,7 @@ class SQLiteBoardRepository:
             connection.execute("DELETE FROM tiles WHERE board_id = ?", (board.board_id,))
             self._insert_tiles(connection, board)
             next_number = cast(
-                int,
+                "int",
                 connection.execute(
                     "SELECT COALESCE(MAX(event_number), 0) + 1 FROM board_events "
                     "WHERE board_id = ?",
@@ -172,34 +194,34 @@ class SQLiteBoardRepository:
 
     @staticmethod
     def _decode_tile(row: sqlite3.Row) -> Tile:
-        codes = cast(str, row["base_ports"])
+        codes = cast("str", row["base_ports"])
         if any(code not in _CODE_PORTS for code in codes):
-            raise ValueError("database contains an unknown port code")
+            raise StoredEventError(UNKNOWN_PORT_CODE)
         return Tile(
             frozenset(_CODE_PORTS[code] for code in codes),
-            Role(cast(str, row["role"])),
-            Orientation(cast(int, row["orientation"])),
+            Role(cast("str", row["role"])),
+            Orientation(cast("int", row["orientation"])),
         )
 
     @staticmethod
     def _encode_event(event: Event) -> tuple[str, str]:
         if isinstance(event, TileRotated):
-            payload = dict(
-                board_id=event.board_id,
-                row=event.cell.row,
-                col=event.cell.col,
-                orientation=event.orientation.quarter_turns,
-                move=event.move,
-            )
+            payload = {
+                "board_id": event.board_id,
+                "row": event.cell.row,
+                "col": event.cell.col,
+                "orientation": event.orientation.quarter_turns,
+                "move": event.move,
+            }
             return "tile_rotated", json.dumps(payload, sort_keys=True)
-        payload = dict(board_id=event.board_id, moves_used=event.moves_used)
+        payload = {"board_id": event.board_id, "moves_used": event.moves_used}
         return "board_solved", json.dumps(payload, sort_keys=True)
 
     @staticmethod
     def _decode_event(event_type: str, payload: str) -> Event:
         data = json.loads(payload)
         if not isinstance(data, dict):
-            raise ValueError("database contains an invalid event payload")
+            raise StoredEventError(INVALID_PAYLOAD)
         if event_type == "tile_rotated":
             return TileRotated(
                 str(data["board_id"]),
@@ -209,4 +231,4 @@ class SQLiteBoardRepository:
             )
         if event_type == "board_solved":
             return BoardSolved(str(data["board_id"]), data["moves_used"])
-        raise ValueError(f"database contains unknown event type: {event_type}")
+        raise StoredEventError(UNKNOWN_EVENT_TYPE.format(event_type))
