@@ -11,6 +11,7 @@ import sys
 from collections import Counter, deque
 from itertools import product
 from pathlib import Path
+from typing import cast
 
 from circuit_shift.domain import (
     Board,
@@ -195,7 +196,7 @@ def orientation_values() -> None:
     refused = 0
     for bad in (-1, 4, 1.0, "1"):
         try:
-            Orientation(bad)  # type: ignore[arg-type]
+            Orientation(cast("int", bad))
         except ValueError:
             refused += 1
     value(
