@@ -1,8 +1,12 @@
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from circuit_shift.application.ports import BoardRecord, BoardRepository
 from circuit_shift.domain import Board, Cell, Event, starter_board
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from circuit_shift.application.ports import BoardRecord, BoardRepository
 
 
 class BoardNotFound(LookupError):

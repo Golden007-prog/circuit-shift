@@ -1,12 +1,16 @@
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from circuit_shift.application.ports import BoardRepository
 from circuit_shift.application.use_cases import ReadBoard, RotateBoard, StartBoard
 from circuit_shift.infrastructure.repository import SQLiteBoardRepository
 from circuit_shift.presentation.health import router
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from circuit_shift.application.ports import BoardRepository
 
 
 class BoardUseCases:

@@ -83,7 +83,7 @@ class SQLiteBoardRepository:
             if row is None:
                 return None
             tiles = {
-                Cell(cast(int, tile_row["row"]), cast(int, tile_row["col"])): self._decode_tile(
+                Cell(cast("int", tile_row["row"]), cast("int", tile_row["col"])): self._decode_tile(
                     tile_row
                 )
                 for tile_row in connection.execute(
@@ -93,15 +93,15 @@ class SQLiteBoardRepository:
                 )
             }
             board = Board(
-                cast(str, row["board_id"]),
-                cast(int, row["rows"]),
-                cast(int, row["cols"]),
+                cast("str", row["board_id"]),
+                cast("int", row["rows"]),
+                cast("int", row["cols"]),
                 tiles,
-                cast(int, row["move_budget"]),
-                cast(int, row["moves_used"]),
+                cast("int", row["move_budget"]),
+                cast("int", row["moves_used"]),
             )
             events = tuple(
-                self._decode_event(cast(str, event["event_type"]), cast(str, event["payload"]))
+                self._decode_event(cast("str", event["event_type"]), cast("str", event["payload"]))
                 for event in connection.execute(
                     """SELECT event_type, payload FROM board_events
                        WHERE board_id = ? ORDER BY event_number""",
@@ -130,7 +130,7 @@ class SQLiteBoardRepository:
             connection.execute("DELETE FROM tiles WHERE board_id = ?", (board.board_id,))
             self._insert_tiles(connection, board)
             next_number = cast(
-                int,
+                "int",
                 connection.execute(
                     "SELECT COALESCE(MAX(event_number), 0) + 1 FROM board_events "
                     "WHERE board_id = ?",
@@ -172,27 +172,27 @@ class SQLiteBoardRepository:
 
     @staticmethod
     def _decode_tile(row: sqlite3.Row) -> Tile:
-        codes = cast(str, row["base_ports"])
+        codes = cast("str", row["base_ports"])
         if any(code not in _CODE_PORTS for code in codes):
             raise ValueError("database contains an unknown port code")
         return Tile(
             frozenset(_CODE_PORTS[code] for code in codes),
-            Role(cast(str, row["role"])),
-            Orientation(cast(int, row["orientation"])),
+            Role(cast("str", row["role"])),
+            Orientation(cast("int", row["orientation"])),
         )
 
     @staticmethod
     def _encode_event(event: Event) -> tuple[str, str]:
         if isinstance(event, TileRotated):
-            payload = dict(
-                board_id=event.board_id,
-                row=event.cell.row,
-                col=event.cell.col,
-                orientation=event.orientation.quarter_turns,
-                move=event.move,
-            )
+            payload = {
+                "board_id": event.board_id,
+                "row": event.cell.row,
+                "col": event.cell.col,
+                "orientation": event.orientation.quarter_turns,
+                "move": event.move,
+            }
             return "tile_rotated", json.dumps(payload, sort_keys=True)
-        payload = dict(board_id=event.board_id, moves_used=event.moves_used)
+        payload = {"board_id": event.board_id, "moves_used": event.moves_used}
         return "board_solved", json.dumps(payload, sort_keys=True)
 
     @staticmethod

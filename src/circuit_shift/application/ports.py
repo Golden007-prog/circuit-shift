@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from circuit_shift.domain import Board, Event
+if TYPE_CHECKING:
+    from circuit_shift.domain import Board, Event
 
 
 @dataclass(frozen=True, slots=True)

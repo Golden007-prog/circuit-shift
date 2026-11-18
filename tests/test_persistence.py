@@ -1,11 +1,14 @@
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from circuit_shift.application.use_cases import BoardNotFound
 from circuit_shift.composition import build_board_use_cases
 from circuit_shift.domain import BoardFinished, BoardSolved, BoardState, Cell, TileRotated
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = pytest.mark.integration
 
