@@ -44,4 +44,4 @@ Tests named `scripts/theory_figs.py#…` are measurements recorded in [figures/v
 
 Reviewed for this handbook: all of `src/circuit_shift/domain/model.py` (the fifteen names exported by `src/circuit_shift/domain/__init__.py`), the two Import Linter contracts in `pyproject.toml`, the application port, SQLite repository and composition wiring, and the domain, application and persistence tests. Presentation remains a health-only adapter; playable routes are M4.
 
-The program is unchanged by this handbook: it adds `scripts/theory_figs.py`, `scripts/theory_check.py`, two Makefile targets, one Ruff per-file setting and these pages.
+The program is unchanged by this handbook: it adds `scripts/theory_figs.py`, `scripts/theory_check.py`, two Makefile targets and these pages.
