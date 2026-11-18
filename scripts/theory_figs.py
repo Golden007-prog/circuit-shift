@@ -94,6 +94,7 @@ def draw(
 
 
 def svg(name: str, width: float, height: float, body: list[str]) -> None:
+    """Write one SVG file with a white background around the given elements."""
     head = (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
         f'width="{width:.0f}" height="{height:.0f}" font-family="sans-serif" font-size="12">'
@@ -105,14 +106,17 @@ def svg(name: str, width: float, height: float, body: list[str]) -> None:
 
 
 def title(text: str) -> str:
+    """Return the bold title line of a figure."""
     return f'<text x="16" y="26" font-size="16" font-weight="bold" fill="#222">{text}</text>'
 
 
 def row_tiles(*pieces: Tile) -> dict[Cell, Tile]:
+    """Place the given tiles left to right on row 0."""
     return {Cell(0, i): piece for i, piece in enumerate(pieces)}
 
 
 def bars(name: str, heading: str, labels: list[str], heights: list[int]) -> None:
+    """Write a bar chart with the count above each bar and the label below."""
     width, height, left, top, plot_w, plot_h = 720, 360, 70, 44, 630, 250
     peak = (max(heights) or 1) * 1.1
     step = plot_w / len(heights)

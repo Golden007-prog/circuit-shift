@@ -36,6 +36,8 @@ BOARD_FINISHED = "the board is {}"
 
 
 class Port(Enum):
+    """One of the four sides of a cell."""
+
     NORTH = "north"
     EAST = "east"
     SOUTH = "south"
@@ -43,10 +45,12 @@ class Port(Enum):
 
     @property
     def clockwise(self) -> Port:
+        """Return the next side clockwise."""
         return _CLOCKWISE[self]
 
     @property
     def opposite(self) -> Port:
+        """Return the side across the cell."""
         return _CLOCKWISE[_CLOCKWISE[self]]
 
     @property
@@ -65,12 +69,16 @@ _STEP = {Port.NORTH: (-1, 0), Port.EAST: (0, 1), Port.SOUTH: (1, 0), Port.WEST: 
 
 
 class Role(Enum):
+    """What a tile is: the source, a lamp, or a wire."""
+
     SOURCE = "source"
     WIRE = "wire"
     LAMP = "lamp"
 
 
 class BoardState(Enum):
+    """Whether a board is still open, solved, or out of moves."""
+
     ACTIVE = "active"
     SOLVED = "solved"
     EXHAUSTED = "exhausted"
@@ -92,11 +100,13 @@ class Cell:
     col: int
 
     def __post_init__(self) -> None:
+        """Refuse a row or column that is not a non-negative whole number."""
         for value in (self.row, self.col):
             if type(value) is not int or value < 0:
                 raise ValueError(CELL_NOT_WHOLE)
 
     def towards(self, port: Port) -> tuple[int, int]:
+        """Return the (row, col) of the neighbour across `port`."""
         d_row, d_col = port.step
         return self.row + d_row, self.col + d_col
 
@@ -108,10 +118,12 @@ class Orientation:
     quarter_turns: int = 0
 
     def __post_init__(self) -> None:
+        """Refuse anything but 0, 1, 2 or 3 quarter-turns."""
         if type(self.quarter_turns) is not int or not 0 <= self.quarter_turns < QUARTER_TURNS:
             raise ValueError(ORIENTATION_RANGE)
 
     def turned(self) -> Orientation:
+        """Return the orientation one quarter-turn further clockwise."""
         return Orientation((self.quarter_turns + 1) % QUARTER_TURNS)
 
 
@@ -124,6 +136,7 @@ class Tile:
     orientation: Orientation = field(default_factory=Orientation)
 
     def __post_init__(self) -> None:
+        """Refuse a tile without ports, with non-port values, or without a role."""
         if not isinstance(self.base_ports, frozenset) or not self.base_ports:
             raise ValueError(TILE_WITHOUT_PORT)
         if any(not isinstance(port, Port) for port in self.base_ports):
@@ -140,6 +153,7 @@ class Tile:
         return ports
 
     def rotated(self) -> Tile:
+        """Return the same tile turned one quarter clockwise."""
         return Tile(self.base_ports, self.role, self.orientation.turned())
 
 
@@ -148,6 +162,7 @@ class Connectivity:
 
     @staticmethod
     def powered(tiles: Mapping[Cell, Tile]) -> frozenset[Cell]:
+        """Return the cells reached from the source through reciprocal ports."""
         sources = [cell for cell, tile in tiles.items() if tile.role is Role.SOURCE]
         seen: set[Cell] = set(sources)
         frontier = list(sources)
@@ -169,6 +184,8 @@ class Connectivity:
 
 @dataclass(frozen=True, slots=True)
 class TileRotated:
+    """Event: one tile was rotated, with the move number."""
+
     board_id: str
     cell: Cell
     orientation: Orientation
@@ -177,6 +194,8 @@ class TileRotated:
 
 @dataclass(frozen=True, slots=True)
 class BoardSolved:
+    """Event: every lamp became powered, with the moves used."""
+
     board_id: str
     moves_used: int
 
@@ -196,6 +215,7 @@ class Board:
     moves_used: int = 0
 
     def __post_init__(self) -> None:
+        """Refuse a malformed board; copy the tiles so the caller's mapping is not shared."""
         self._check_shape()
         self.tiles = dict(self.tiles)
         self._check_tiles()
@@ -225,14 +245,17 @@ class Board:
 
     @property
     def powered(self) -> frozenset[Cell]:
+        """Cells currently reached from the source."""
         return Connectivity.powered(self.tiles)
 
     @property
     def lamps(self) -> frozenset[Cell]:
+        """Cells that hold a lamp."""
         return frozenset(cell for cell, tile in self.tiles.items() if tile.role is Role.LAMP)
 
     @property
     def state(self) -> BoardState:
+        """Solved when every lamp is powered, exhausted when moves run out, else active."""
         if self.lamps <= self.powered:
             return BoardState.SOLVED  # solving on the last move wins before exhaustion
         if self.moves_used >= self.move_budget:

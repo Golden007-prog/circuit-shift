@@ -1,3 +1,5 @@
+"""SQLite adapter for the application board repository port."""
+
 import json
 import sqlite3
 from pathlib import Path
@@ -70,6 +72,7 @@ class SQLiteBoardRepository:
     """A file-backed repository; each operation opens and closes its own connection."""
 
     def __init__(self, path: str | Path) -> None:
+        """Open (and create if needed) the database at `path`."""
         self._path = str(path)
         if self._path == ":memory:":
             raise ValueError(FILE_DATABASE_REQUIRED)
@@ -78,6 +81,7 @@ class SQLiteBoardRepository:
             connection.executescript(_SCHEMA)
 
     def add(self, board: Board) -> None:
+        """Insert the board and its tiles."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
@@ -88,6 +92,7 @@ class SQLiteBoardRepository:
             self._insert_tiles(connection, board)
 
     def get(self, board_id: str) -> BoardRecord | None:
+        """Return the stored board and its events, or None."""
         with self._connect() as connection:
             connection.execute("BEGIN")
             row = connection.execute(
@@ -126,6 +131,7 @@ class SQLiteBoardRepository:
             return BoardRecord(board, events)
 
     def save(self, board: Board, events: tuple[Event, ...], expected_moves: int) -> bool:
+        """Update the board and append events atomically if no move was saved since."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             changed = connection.execute(

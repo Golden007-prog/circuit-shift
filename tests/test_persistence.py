@@ -1,3 +1,5 @@
+"""The SQLite repository: persistence and atomic saves."""
+
 import sqlite3
 from typing import TYPE_CHECKING
 
@@ -22,6 +24,7 @@ pytestmark = pytest.mark.integration
 
 
 def test_req_persistence_state_and_ordered_events_survive_reopen(tmp_path: Path) -> None:
+    """REQ-PERSISTENCE: board state and ordered events survive reopening."""
     database = tmp_path / "boards.sqlite3"
     first = build_board_use_cases(database)
     board = first.start.execute()
@@ -43,6 +46,7 @@ def test_req_persistence_state_and_ordered_events_survive_reopen(tmp_path: Path)
 
 
 def test_req_persistence_exhausted_state_survives_reopen(tmp_path: Path) -> None:
+    """REQ-PERSISTENCE: an exhausted board stays exhausted after reopening."""
     database = tmp_path / "boards.sqlite3"
     first = build_board_use_cases(database)
     board = first.start.execute()
@@ -60,6 +64,7 @@ def test_req_persistence_exhausted_state_survives_reopen(tmp_path: Path) -> None
 
 
 def test_req_atomic_event_failure_rolls_back_board_state(tmp_path: Path) -> None:
+    """REQ-ATOMIC: a failed event insert rolls back the board."""
     database = tmp_path / "boards.sqlite3"
     use_cases = build_board_use_cases(database)
     board = use_cases.start.execute()
@@ -82,6 +87,7 @@ def test_req_atomic_event_failure_rolls_back_board_state(tmp_path: Path) -> None
 def test_req_persistence_missing_and_invalid_operations_leave_sqlite_unchanged(
     tmp_path: Path,
 ) -> None:
+    """REQ-PERSISTENCE: missing boards and invalid rotations write nothing."""
     use_cases = build_board_use_cases(tmp_path / "boards.sqlite3")
     board = use_cases.start.execute()
     before = use_cases.read.execute(board.board_id)
