@@ -2,6 +2,7 @@
 
 import copy
 from itertools import product
+from typing import Any, cast
 
 import pytest
 
@@ -21,8 +22,23 @@ from circuit_shift.domain import (
     starter_board,
     tile,
 )
+from circuit_shift.domain.model import (
+    BOARD_TOO_SMALL,
+    BOARD_WITHOUT_IDENTITY,
+    BUDGET_NOT_POSITIVE,
+    CELL_NOT_WHOLE,
+    LAMP_MISSING,
+    MOVES_OUT_OF_RANGE,
+    ORIENTATION_RANGE,
+    SOURCE_COUNT,
+    TILE_OFF_BOARD,
+    TILE_WITHOUT_PORT,
+)
 
 N, E, S, W = Port.NORTH, Port.EAST, Port.SOUTH, Port.WEST
+
+STARTER_FEWEST_ROTATIONS = 4  # the starter board needs four rotations at least
+STARTER_WINS_WITHIN_BUDGET = 7  # ways to win the starter board within its budget
 
 
 def state_of(board: Board) -> BoardState:
@@ -55,27 +71,28 @@ def test_req_tile_rotation_gives_a_new_value_and_wraps_after_four() -> None:
     assert corner.orientation == Orientation(0)
     assert turned.orientation == Orientation(1)
     assert turned.rotated().rotated().rotated() == corner
+    field = "role"
     with pytest.raises(AttributeError):
-        corner.role = Role.LAMP  # type: ignore[misc]
+        setattr(corner, field, Role.LAMP)  # a frozen value cannot be reassigned
     assert tile("ew").rotated().rotated().ports == tile("ew").ports  # symmetric after two
 
 
 @pytest.mark.parametrize("bad", [-1, 4, 1.0, "1", None])
 def test_req_tile_orientation_is_zero_to_three(bad: object) -> None:
-    with pytest.raises(ValueError):
-        Orientation(bad)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match=ORIENTATION_RANGE):
+        Orientation(cast("int", bad))
 
 
 def test_req_tile_values_reject_malformed_input() -> None:
     for bad in ((-1, 0), (0, -1), (0.0, 0), ("0", 0)):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=CELL_NOT_WHOLE):
             Cell(*bad)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=TILE_WITHOUT_PORT):
         Tile(frozenset())
     with pytest.raises(TypeError):
-        Tile(frozenset({"north"}))  # type: ignore[arg-type]
+        Tile(cast("frozenset[Port]", frozenset({"north"})))
     with pytest.raises(TypeError):
-        Tile(frozenset({N}), "wire")  # type: ignore[arg-type]
+        Tile(frozenset({N}), cast("Role", "wire"))
 
 
 def test_req_connect_documented_one_row_example() -> None:
@@ -174,10 +191,19 @@ def test_req_board_creation_rejects_malformed_boards() -> None:
         },
         {"board_id": "b", "rows": 1, "cols": 2, "tiles": good, "move_budget": 1, "moves_used": 2},
     ):
-        with pytest.raises(ValueError):
-            Board(**kwargs)  # type: ignore[arg-type]
+        shape_rules = (
+            BOARD_WITHOUT_IDENTITY,
+            BOARD_TOO_SMALL,
+            BUDGET_NOT_POSITIVE,
+            MOVES_OUT_OF_RANGE,
+            TILE_OFF_BOARD,
+            SOURCE_COUNT,
+            LAMP_MISSING,
+        )
+        with pytest.raises(ValueError, match="|".join(shape_rules)):
+            Board(**cast("dict[str, Any]", kwargs))
     with pytest.raises(TypeError):
-        Board("b", 1, 2, {(0, 0): source, Cell(0, 1): lamp}, 1)  # type: ignore[dict-item]
+        Board("b", 1, 2, cast("dict[Cell, Tile]", {(0, 0): source, Cell(0, 1): lamp}), 1)
 
 
 def test_req_board_a_board_can_start_solved_and_then_rejects_rotation() -> None:
@@ -228,7 +254,7 @@ def test_req_board_invalid_commands_cost_nothing() -> None:
     with pytest.raises(InvalidRotationError):
         sparse.rotate(Cell(0, 1))  # an empty cell
     with pytest.raises(InvalidRotationError):
-        board.rotate((0, 1))  # type: ignore[arg-type]
+        board.rotate(cast("Cell", (0, 1)))
     assert board == before
     assert sparse.moves_used == 0
 
@@ -258,8 +284,8 @@ def test_req_board_starter_needs_four_rotations_found_by_search() -> None:
                 tiles[cell] = tiles[cell].rotated()
         if board.lamps <= Connectivity.powered(tiles):
             costs.append(sum(turns))
-    assert min(costs) == 4
-    assert sum(cost <= board.move_budget for cost in costs) == 7  # ways to win within the budget
+    assert min(costs) == STARTER_FEWEST_ROTATIONS
+    assert sum(cost <= board.move_budget for cost in costs) == STARTER_WINS_WITHIN_BUDGET
     assert starter_board("other").board_id == "other"
 
 

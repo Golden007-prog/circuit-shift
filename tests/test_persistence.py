@@ -5,7 +5,15 @@ import pytest
 
 from circuit_shift.application.use_cases import BoardNotFoundError
 from circuit_shift.composition import build_board_use_cases
-from circuit_shift.domain import BoardFinishedError, BoardSolved, BoardState, Cell, TileRotated
+from circuit_shift.domain import (
+    BoardFinishedError,
+    BoardSolved,
+    BoardState,
+    Cell,
+    Orientation,
+    TileRotated,
+    starter_board,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,7 +36,7 @@ def test_req_persistence_state_and_ordered_events_survive_reopen(tmp_path: Path)
     assert (stored.board.rows, stored.board.cols) == (3, 3)
     assert (stored.board.move_budget, stored.board.moves_used) == (6, 4)
     assert stored.board.tiles[Cell(0, 1)].orientation.quarter_turns == 1
-    assert stored.board.tiles[Cell(0, 2)].orientation.quarter_turns == 2
+    assert stored.board.tiles[Cell(0, 2)].orientation == Orientation(2)
     assert stored.events == expected_events
     assert sum(isinstance(event, BoardSolved) for event in stored.events) == 1
     assert all(isinstance(event, (TileRotated, BoardSolved)) for event in stored.events)
@@ -44,7 +52,8 @@ def test_req_persistence_exhausted_state_survives_reopen(tmp_path: Path) -> None
     reopened = build_board_use_cases(database)
     stored = reopened.read.execute(board.board_id)
     assert stored.board.state is BoardState.EXHAUSTED
-    assert stored.board.moves_used == stored.board.move_budget == 6
+    assert stored.board.moves_used == stored.board.move_budget
+    assert stored.board.move_budget == starter_board().move_budget
     with pytest.raises(BoardFinishedError):
         reopened.rotate.execute(board.board_id, Cell(2, 2))
     assert reopened.read.execute(board.board_id) == stored
