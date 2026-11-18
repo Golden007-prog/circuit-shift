@@ -4,8 +4,8 @@ import pytest
 
 from circuit_shift.application.ports import BoardRecord, BoardRepository
 from circuit_shift.application.use_cases import (
-    BoardConflict,
-    BoardNotFound,
+    BoardConflictError,
+    BoardNotFoundError,
     ReadBoard,
     RotateBoard,
     StartBoard,
@@ -33,7 +33,7 @@ class MemoryBoardRepository:
         return True
 
 
-def test_REQ_USECASE_start_read_and_rotate_preserve_event_history() -> None:
+def test_req_usecase_start_read_and_rotate_preserve_event_history() -> None:
     repository: BoardRepository = MemoryBoardRepository()
     board = StartBoard(repository, lambda: "board-1").execute()
     rotation = RotateBoard(repository).execute(board.board_id, Cell(0, 1))
@@ -46,14 +46,14 @@ def test_REQ_USECASE_start_read_and_rotate_preserve_event_history() -> None:
     assert isinstance(stored.events[0], TileRotated)
 
 
-def test_REQ_USECASE_unknown_board_and_invalid_rotation_do_not_save() -> None:
+def test_req_usecase_unknown_board_and_invalid_rotation_do_not_save() -> None:
     repository = MemoryBoardRepository()
     board = StartBoard(repository, lambda: "board-1").execute()
     rotate = RotateBoard(repository)
 
-    with pytest.raises(BoardNotFound):
+    with pytest.raises(BoardNotFoundError):
         rotate.execute("missing", Cell(0, 1))
-    with pytest.raises(BoardNotFound):
+    with pytest.raises(BoardNotFoundError):
         ReadBoard(repository).execute("missing")
     with pytest.raises(ValueError, match="fixed"):
         rotate.execute(board.board_id, Cell(0, 0))
@@ -63,12 +63,12 @@ def test_REQ_USECASE_unknown_board_and_invalid_rotation_do_not_save() -> None:
     assert stored.events == ()
 
 
-def test_REQ_USECASE_stale_write_is_reported_as_a_conflict() -> None:
+def test_req_usecase_stale_write_is_reported_as_a_conflict() -> None:
     repository = MemoryBoardRepository()
     board = StartBoard(repository, lambda: "board-1").execute()
     repository.conflict = True
 
-    with pytest.raises(BoardConflict):
+    with pytest.raises(BoardConflictError):
         RotateBoard(repository).execute(board.board_id, Cell(0, 1))
 
     stored = ReadBoard(repository).execute(board.board_id)

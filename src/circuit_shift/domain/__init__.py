@@ -2,13 +2,13 @@
 
 from circuit_shift.domain.model import (
     Board,
-    BoardFinished,
+    BoardFinishedError,
     BoardSolved,
     BoardState,
     Cell,
     Connectivity,
     Event,
-    InvalidRotation,
+    InvalidRotationError,
     Orientation,
     Port,
     Role,
@@ -20,13 +20,13 @@ from circuit_shift.domain.model import (
 
 __all__ = [
     "Board",
-    "BoardFinished",
+    "BoardFinishedError",
     "BoardSolved",
     "BoardState",
     "Cell",
     "Connectivity",
     "Event",
-    "InvalidRotation",
+    "InvalidRotationError",
     "Orientation",
     "Port",
     "Role",

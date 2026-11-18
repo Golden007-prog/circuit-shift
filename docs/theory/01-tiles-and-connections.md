@@ -75,9 +75,9 @@ classDiagram
     Board ..> BoardSolved : emits
 ```
 
-**Code.** `src/circuit_shift/domain/model.py`: `Cell`, `Port`, `Orientation`, `Tile`, `Role`, `Connectivity`, `Board`, `BoardState`, `TileRotated`, `BoardSolved`, the union `Event`, the exceptions `BoardFinished` and `InvalidRotation`, and the helpers `tile` and `starter_board`.
+**Code.** `src/circuit_shift/domain/model.py`: `Cell`, `Port`, `Orientation`, `Tile`, `Role`, `Connectivity`, `Board`, `BoardState`, `TileRotated`, `BoardSolved`, the union `Event`, the exceptions `BoardFinishedError` and `InvalidRotationError`, and the helpers `tile` and `starter_board`.
 
-**Tests.** `test_REQ_CONNECT_documented_one_row_example` in `tests/test_domain.py` builds these objects and compares the events by value.
+**Tests.** `test_req_connect_documented_one_row_example` in `tests/test_domain.py` builds these objects and compares the events by value.
 
 ## S02 — Ports turn clockwise
 
@@ -95,7 +95,7 @@ and a tile's ports are its base ports turned as many times as its orientation sa
 
 **Code.** `Port.clockwise`, `Port.opposite`, `Port.step`, `Orientation.turned`, `Tile.ports` and `Tile.rotated` in `src/circuit_shift/domain/model.py`.
 
-**Tests.** `test_REQ_TILE_clockwise_and_opposite_ports`, `test_REQ_TILE_all_four_orientations`, `test_REQ_TILE_rotation_gives_a_new_value_and_wraps_after_four`, `test_REQ_TILE_orientation_is_zero_to_three`. Measured: `turn-cycle` = 1, `turn-ports` = 1; `turn-distinct-corner` = 4, `turn-distinct-bar` = 2, `turn-distinct-cross` = 1; `orientation-rejected` = 4 of 4.
+**Tests.** `test_req_tile_clockwise_and_opposite_ports`, `test_req_tile_all_four_orientations`, `test_req_tile_rotation_gives_a_new_value_and_wraps_after_four`, `test_req_tile_orientation_is_zero_to_three`. Measured: `turn-cycle` = 1, `turn-ports` = 1; `turn-distinct-corner` = 4, `turn-distinct-bar` = 2, `turn-distinct-cross` = 1; `orientation-rejected` = 4 of 4.
 
 ## S03 — A connection needs both sides
 
@@ -109,7 +109,7 @@ and a tile's ports are its base ports turned as many times as its orientation sa
 
 **Code.** The loop of `Connectivity.powered` in `src/circuit_shift/domain/model.py`: for each port of a tile it steps to the neighbour (`Cell.towards`), skips negative coordinates and empty cells, and requires `port.opposite` among the neighbour's ports.
 
-**Tests.** `test_REQ_CONNECT_documented_one_row_example`, `test_REQ_CONNECT_ports_must_be_reciprocal`, `test_REQ_CONNECT_borders_do_not_wrap`. Measured on the four boards of the figure: `connect-example-dark` = 0, `connect-example-lit` = 1, `connect-one-sided` = 0, `connect-no-wrap` = 0.
+**Tests.** `test_req_connect_documented_one_row_example`, `test_req_connect_ports_must_be_reciprocal`, `test_req_connect_borders_do_not_wrap`. Measured on the four boards of the figure: `connect-example-dark` = 0, `connect-example-lit` = 1, `connect-one-sided` = 0, `connect-no-wrap` = 0.
 
 ## S04 — Powered means reachable from the source
 
@@ -135,7 +135,7 @@ flowchart TD
 
 **Code.** `Connectivity.powered`, `Board.powered` and `Board.lamps` in `src/circuit_shift/domain/model.py`.
 
-**Tests.** `test_REQ_CONNECT_cycles_and_dangling_ports_are_allowed`, `test_REQ_CONNECT_every_lamp_must_be_reached`. Measured on the two boards of the figure: `connect-cycle` = 4 powered tiles (the loop, not the lamp) and `connect-island` = 1 (the source alone).
+**Tests.** `test_req_connect_cycles_and_dangling_ports_are_allowed`, `test_req_connect_every_lamp_must_be_reached`. Measured on the two boards of the figure: `connect-cycle` = 4 powered tiles (the loop, not the lamp) and `connect-island` = 1 (the source alone).
 
 ## References
 

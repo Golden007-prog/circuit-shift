@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from circuit_shift.application.use_cases import BoardNotFound
+from circuit_shift.application.use_cases import BoardNotFoundError
 from circuit_shift.composition import build_board_use_cases
-from circuit_shift.domain import BoardFinished, BoardSolved, BoardState, Cell, TileRotated
+from circuit_shift.domain import BoardFinishedError, BoardSolved, BoardState, Cell, TileRotated
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 
-def test_REQ_PERSISTENCE_state_and_ordered_events_survive_reopen(tmp_path: Path) -> None:
+def test_req_persistence_state_and_ordered_events_survive_reopen(tmp_path: Path) -> None:
     database = tmp_path / "boards.sqlite3"
     first = build_board_use_cases(database)
     board = first.start.execute()
@@ -34,7 +34,7 @@ def test_REQ_PERSISTENCE_state_and_ordered_events_survive_reopen(tmp_path: Path)
     assert all(isinstance(event, (TileRotated, BoardSolved)) for event in stored.events)
 
 
-def test_REQ_PERSISTENCE_exhausted_state_survives_reopen(tmp_path: Path) -> None:
+def test_req_persistence_exhausted_state_survives_reopen(tmp_path: Path) -> None:
     database = tmp_path / "boards.sqlite3"
     first = build_board_use_cases(database)
     board = first.start.execute()
@@ -45,12 +45,12 @@ def test_REQ_PERSISTENCE_exhausted_state_survives_reopen(tmp_path: Path) -> None
     stored = reopened.read.execute(board.board_id)
     assert stored.board.state is BoardState.EXHAUSTED
     assert stored.board.moves_used == stored.board.move_budget == 6
-    with pytest.raises(BoardFinished):
+    with pytest.raises(BoardFinishedError):
         reopened.rotate.execute(board.board_id, Cell(2, 2))
     assert reopened.read.execute(board.board_id) == stored
 
 
-def test_REQ_ATOMIC_event_failure_rolls_back_board_state(tmp_path: Path) -> None:
+def test_req_atomic_event_failure_rolls_back_board_state(tmp_path: Path) -> None:
     database = tmp_path / "boards.sqlite3"
     use_cases = build_board_use_cases(database)
     board = use_cases.start.execute()
@@ -70,16 +70,16 @@ def test_REQ_ATOMIC_event_failure_rolls_back_board_state(tmp_path: Path) -> None
     assert stored.events == ()
 
 
-def test_REQ_PERSISTENCE_missing_and_invalid_operations_leave_sqlite_unchanged(
+def test_req_persistence_missing_and_invalid_operations_leave_sqlite_unchanged(
     tmp_path: Path,
 ) -> None:
     use_cases = build_board_use_cases(tmp_path / "boards.sqlite3")
     board = use_cases.start.execute()
     before = use_cases.read.execute(board.board_id)
 
-    with pytest.raises(BoardNotFound):
+    with pytest.raises(BoardNotFoundError):
         use_cases.read.execute("missing")
-    with pytest.raises(BoardNotFound):
+    with pytest.raises(BoardNotFoundError):
         use_cases.rotate.execute("missing", Cell(0, 1))
     with pytest.raises(ValueError, match="fixed"):
         use_cases.rotate.execute(board.board_id, Cell(0, 0))

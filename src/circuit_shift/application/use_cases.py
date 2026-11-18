@@ -9,11 +9,11 @@ if TYPE_CHECKING:
     from circuit_shift.application.ports import BoardRecord, BoardRepository
 
 
-class BoardNotFound(LookupError):
+class BoardNotFoundError(LookupError):
     """No board exists with the requested identity."""
 
 
-class BoardConflict(RuntimeError):
+class BoardConflictError(RuntimeError):
     """The board changed after it was read."""
 
 
@@ -37,7 +37,7 @@ class ReadBoard:
     def execute(self, board_id: str) -> BoardRecord:
         record = self._repository.get(board_id)
         if record is None:
-            raise BoardNotFound(board_id)
+            raise BoardNotFoundError(board_id)
         return record
 
 
@@ -48,9 +48,9 @@ class RotateBoard:
     def execute(self, board_id: str, cell: Cell) -> tuple[Event, ...]:
         record = self._repository.get(board_id)
         if record is None:
-            raise BoardNotFound(board_id)
+            raise BoardNotFoundError(board_id)
         expected_moves = record.board.moves_used
         events = record.board.rotate(cell)
         if not self._repository.save(record.board, events, expected_moves):
-            raise BoardConflict(board_id)
+            raise BoardConflictError(board_id)
         return events

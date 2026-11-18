@@ -54,11 +54,11 @@ class BoardState(Enum):
     EXHAUSTED = "exhausted"
 
 
-class BoardFinished(Exception):
+class BoardFinishedError(Exception):
     """A solved or exhausted board accepts no rotation."""
 
 
-class InvalidRotation(ValueError):
+class InvalidRotationError(ValueError):
     """The cell is off the board, empty, or holds a fixed tile."""
 
 
@@ -217,14 +217,14 @@ class Board:
         Nothing changes when the board is finished or the command is invalid.
         """
         if self.state is not BoardState.ACTIVE:
-            raise BoardFinished(f"the board is {self.state.value}")
+            raise BoardFinishedError(f"the board is {self.state.value}")
         if not isinstance(cell, Cell):
-            raise InvalidRotation("a cell is required")
+            raise InvalidRotationError("a cell is required")
         tile = self.tiles.get(cell)
         if tile is None:
-            raise InvalidRotation("there is no tile at that cell")
+            raise InvalidRotationError("there is no tile at that cell")
         if tile.role is not Role.WIRE:
-            raise InvalidRotation("source and lamp tiles are fixed")
+            raise InvalidRotationError("source and lamp tiles are fixed")
         turned = tile.rotated()
         self.tiles[cell] = turned
         self.moves_used += 1

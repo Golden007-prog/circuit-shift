@@ -27,7 +27,7 @@ flowchart TD
 
 **Code.** `Board.__post_init__` in `src/circuit_shift/domain/model.py`.
 
-**Tests.** `test_REQ_BOARD_creation_rejects_malformed_boards` (ten kinds), `test_REQ_BOARD_a_board_can_start_solved_and_then_rejects_rotation`. Measured: `board-rejected` = 5 of 5 — no source, two sources, no lamp, a budget of zero, a tile off the board.
+**Tests.** `test_req_board_creation_rejects_malformed_boards` (ten kinds), `test_req_board_a_board_can_start_solved_and_then_rejects_rotation`. Measured: `board-rejected` = 5 of 5 — no source, two sources, no lamp, a budget of zero, a tile off the board.
 
 ## S06 — One rotation: a move, a new state, events
 
@@ -46,14 +46,14 @@ stateDiagram-v2
     Active --> Active: rotate a wire, lamps still dark, moves left (TileRotated)
     Active --> Solved: rotate a wire, every lamp powered (TileRotated, BoardSolved) — the last move included
     Active --> Exhausted: rotate a wire, lamps still dark, no move left (TileRotated)
-    Active --> Active: invalid cell or fixed tile → InvalidRotation, nothing changes
-    Solved --> Solved: rotate → BoardFinished, nothing changes
-    Exhausted --> Exhausted: rotate → BoardFinished, nothing changes
+    Active --> Active: invalid cell or fixed tile → InvalidRotationError, nothing changes
+    Solved --> Solved: rotate → BoardFinishedError, nothing changes
+    Exhausted --> Exhausted: rotate → BoardFinishedError, nothing changes
 ```
 
-**Code.** `Board.rotate` and `Board.state` in `src/circuit_shift/domain/model.py`; the events `TileRotated` and `BoardSolved`; the exceptions `BoardFinished` and `InvalidRotation`.
+**Code.** `Board.rotate` and `Board.state` in `src/circuit_shift/domain/model.py`; the events `TileRotated` and `BoardSolved`; the exceptions `BoardFinishedError` and `InvalidRotationError`.
 
-**Tests.** `test_REQ_BOARD_symmetric_rotation_still_costs_a_move`, `test_REQ_BOARD_solving_on_the_last_move_wins`, `test_REQ_BOARD_running_out_of_moves_exhausts_and_rejects`, `test_REQ_BOARD_invalid_commands_cost_nothing`, `test_REQ_BOARD_solved_event_only_on_the_first_transition`. Measured: `last-move-wins` = 1, `budget-exhausts` = 1, `terminal-refuses` = 1 with `terminal-moves` = 2 unchanged; `invalid-refused` = 4 of 4 with `invalid-free` = 0 moves used.
+**Tests.** `test_req_board_symmetric_rotation_still_costs_a_move`, `test_req_board_solving_on_the_last_move_wins`, `test_req_board_running_out_of_moves_exhausts_and_rejects`, `test_req_board_invalid_commands_cost_nothing`, `test_req_board_solved_event_only_on_the_first_transition`. Measured: `last-move-wins` = 1, `budget-exhausts` = 1, `terminal-refuses` = 1 with `terminal-moves` = 2 unchanged; `invalid-refused` = 4 of 4 with `invalid-free` = 0 moves used.
 
 ## S07 — The starter board can be solved, in four moves
 
@@ -69,7 +69,7 @@ stateDiagram-v2
 
 **Code.** `starter_board` and the shorthand `tile` in `src/circuit_shift/domain/model.py`.
 
-**Tests.** `test_REQ_BOARD_starter_needs_four_rotations_found_by_search`, `test_REQ_BOARD_same_commands_give_the_same_board`. Measured: `starter-wires` = 6, `starter-powered-start` = 1; `starter-combos` = 4096, `starter-solutions` = 32, `starter-minimum` = 4, `starter-within-budget` = 7, `starter-shortest-play` = 4; playing the four moves gives `starter-events` = 5 events of which `starter-solved-events` = 1 is BoardSolved, with move numbers 1 to 4 (`starter-moves`), and the board is solved (`starter-solved`).
+**Tests.** `test_req_board_starter_needs_four_rotations_found_by_search`, `test_req_board_same_commands_give_the_same_board`. Measured: `starter-wires` = 6, `starter-powered-start` = 1; `starter-combos` = 4096, `starter-solutions` = 32, `starter-minimum` = 4, `starter-within-budget` = 7, `starter-shortest-play` = 4; playing the four moves gives `starter-events` = 5 events of which `starter-solved-events` = 1 is BoardSolved, with move numbers 1 to 4 (`starter-moves`), and the board is solved (`starter-solved`).
 
 ## S08 — The rules do not know about the web
 
@@ -96,7 +96,7 @@ flowchart TD
 
 **Code.** The two Import Linter contracts in `pyproject.toml` (`Adapters point inward and remain independent`, `Core excludes web frameworks, validation and storage adapters`); `src/circuit_shift/application/ports.py`, `src/circuit_shift/infrastructure/repository.py` and `src/circuit_shift/composition.py` implement and wire the persistence boundary; `src/circuit_shift/domain/__init__.py` exports the fifteen names of S01.
 
-**Tests.** `make check` runs Import Linter (2 contracts kept); `test_REQ_CORE_imports_without_site_packages` in `tests/test_scaffold.py` starts Python with site packages disabled and imports the domain and the application; `tests/test_persistence.py` exercises SQLite through the composition root.
+**Tests.** `make check` runs Import Linter (2 contracts kept); `test_req_core_imports_without_site_packages` in `tests/test_scaffold.py` starts Python with site packages disabled and imports the domain and the application; `tests/test_persistence.py` exercises SQLite through the composition root.
 
 ## References
 

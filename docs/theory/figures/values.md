@@ -30,7 +30,7 @@ The last column is the relative error; where the theory column is 0 it is the ab
 | `starter-shortest-play` | shortest sequence of legal rotations that solves the board, by breadth-first search through the aggregate (the same as the minimum above) | 4 | 4 | 0.00e+00 |
 | `last-move-wins` | state when the only move of a budget of one solves the board (1 = solved, not exhausted) | 1 | 1 | 0.00e+00 |
 | `budget-exhausts` | state after two unsolving moves of a budget of two (1 = exhausted) | 1 | 1 | 0.00e+00 |
-| `terminal-refuses` | a rotation on an exhausted board raises BoardFinished (theory 1) | 1 | 1 | 0.00e+00 |
+| `terminal-refuses` | a rotation on an exhausted board raises BoardFinishedError (theory 1) | 1 | 1 | 0.00e+00 |
 | `terminal-moves` | moves used after that refusal (theory 2: nothing was added) | 2 | 2 | 0.00e+00 |
 | `invalid-refused` | rotations of the source, the two lamps and a cell off the board that are refused (theory 4) | 4 | 4 | 0.00e+00 |
 | `invalid-free` | moves used after those four refusals (theory 0) | 0 | 0 | 0.00e+00 |

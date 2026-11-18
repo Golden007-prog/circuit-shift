@@ -7,12 +7,12 @@ import pytest
 
 from circuit_shift.domain import (
     Board,
-    BoardFinished,
+    BoardFinishedError,
     BoardSolved,
     BoardState,
     Cell,
     Connectivity,
-    InvalidRotation,
+    InvalidRotationError,
     Orientation,
     Port,
     Role,
@@ -34,7 +34,7 @@ def row_board(*tiles: Tile, budget: int = 3) -> Board:
     return Board("row", 1, len(tiles), {Cell(0, i): t for i, t in enumerate(tiles)}, budget)
 
 
-def test_REQ_TILE_clockwise_and_opposite_ports() -> None:
+def test_req_tile_clockwise_and_opposite_ports() -> None:
     assert [N.clockwise, E.clockwise, S.clockwise, W.clockwise] == [E, S, W, N]
     assert [N.opposite, E.opposite, S.opposite, W.opposite] == [S, W, N, E]
     assert Cell(1, 1).towards(N) == (0, 1)
@@ -45,11 +45,11 @@ def test_REQ_TILE_clockwise_and_opposite_ports() -> None:
     ("turns", "expected"),
     [(0, {N, E}), (1, {E, S}), (2, {S, W}), (3, {W, N})],
 )
-def test_REQ_TILE_all_four_orientations(turns: int, expected: set[Port]) -> None:
+def test_req_tile_all_four_orientations(turns: int, expected: set[Port]) -> None:
     assert tile("ne", turns=turns).ports == expected
 
 
-def test_REQ_TILE_rotation_gives_a_new_value_and_wraps_after_four() -> None:
+def test_req_tile_rotation_gives_a_new_value_and_wraps_after_four() -> None:
     corner = tile("ne")
     turned = corner.rotated()
     assert corner.orientation == Orientation(0)
@@ -61,12 +61,12 @@ def test_REQ_TILE_rotation_gives_a_new_value_and_wraps_after_four() -> None:
 
 
 @pytest.mark.parametrize("bad", [-1, 4, 1.0, "1", None])
-def test_REQ_TILE_orientation_is_zero_to_three(bad: object) -> None:
+def test_req_tile_orientation_is_zero_to_three(bad: object) -> None:
     with pytest.raises(ValueError):
         Orientation(bad)  # type: ignore[arg-type]
 
 
-def test_REQ_TILE_values_reject_malformed_input() -> None:
+def test_req_tile_values_reject_malformed_input() -> None:
     for bad in ((-1, 0), (0, -1), (0.0, 0), ("0", 0)):
         with pytest.raises(ValueError):
             Cell(*bad)
@@ -78,7 +78,7 @@ def test_REQ_TILE_values_reject_malformed_input() -> None:
         Tile(frozenset({N}), "wire")  # type: ignore[arg-type]
 
 
-def test_REQ_CONNECT_documented_one_row_example() -> None:
+def test_req_connect_documented_one_row_example() -> None:
     board = row_board(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP))
     assert board.powered == {Cell(0, 0)}
     assert board.state is BoardState.ACTIVE
@@ -91,13 +91,13 @@ def test_REQ_CONNECT_documented_one_row_example() -> None:
     assert state_of(board) is BoardState.SOLVED
 
 
-def test_REQ_CONNECT_ports_must_be_reciprocal() -> None:
+def test_req_connect_ports_must_be_reciprocal() -> None:
     # a source opening east next to a wire opening east only: not a connection
     board = row_board(tile("e", Role.SOURCE), tile("e"), tile("w", Role.LAMP))
     assert board.powered == {Cell(0, 0)}
 
 
-def test_REQ_CONNECT_borders_do_not_wrap() -> None:
+def test_req_connect_borders_do_not_wrap() -> None:
     # the lamp at the far right opens east, the source at the far left opens west
     board = row_board(tile("w", Role.SOURCE), tile("ew"), tile("e", Role.LAMP))
     assert board.powered == {Cell(0, 0)}
@@ -107,7 +107,7 @@ def test_REQ_CONNECT_borders_do_not_wrap() -> None:
     assert column.powered == {Cell(0, 0)}
 
 
-def test_REQ_CONNECT_cycles_and_dangling_ports_are_allowed() -> None:
+def test_req_connect_cycles_and_dangling_ports_are_allowed() -> None:
     tiles = {
         Cell(0, 0): tile("es", Role.SOURCE),
         Cell(0, 1): tile("sw"),
@@ -126,7 +126,7 @@ def test_REQ_CONNECT_cycles_and_dangling_ports_are_allowed() -> None:
     assert Connectivity.powered(island) == {Cell(0, 0)}  # a connected pair away from the source
 
 
-def test_REQ_CONNECT_every_lamp_must_be_reached() -> None:
+def test_req_connect_every_lamp_must_be_reached() -> None:
     board = row_board(
         tile("e", Role.LAMP), tile("ew", Role.SOURCE), tile("ns"), tile("w", Role.LAMP)
     )
@@ -136,7 +136,7 @@ def test_REQ_CONNECT_every_lamp_must_be_reached() -> None:
     assert state_of(board) is BoardState.SOLVED
 
 
-def test_REQ_BOARD_creation_rejects_malformed_boards() -> None:
+def test_req_board_creation_rejects_malformed_boards() -> None:
     source, lamp, wire = tile("e", Role.SOURCE), tile("w", Role.LAMP), tile("ew")
     good = {Cell(0, 0): source, Cell(0, 1): lamp}
     for kwargs in (
@@ -180,15 +180,15 @@ def test_REQ_BOARD_creation_rejects_malformed_boards() -> None:
         Board("b", 1, 2, {(0, 0): source, Cell(0, 1): lamp}, 1)  # type: ignore[dict-item]
 
 
-def test_REQ_BOARD_a_board_can_start_solved_and_then_rejects_rotation() -> None:
+def test_req_board_a_board_can_start_solved_and_then_rejects_rotation() -> None:
     board = row_board(tile("e", Role.SOURCE), tile("ew"), tile("w", Role.LAMP))
     assert state_of(board) is BoardState.SOLVED
-    with pytest.raises(BoardFinished):
+    with pytest.raises(BoardFinishedError):
         board.rotate(Cell(0, 1))
     assert board.moves_used == 0
 
 
-def test_REQ_BOARD_symmetric_rotation_still_costs_a_move() -> None:
+def test_req_board_symmetric_rotation_still_costs_a_move() -> None:
     board = row_board(tile("e", Role.SOURCE), tile("nesw"), tile("n", Role.LAMP), budget=2)
     (event,) = board.rotate(Cell(0, 1))
     assert isinstance(event, TileRotated)
@@ -197,7 +197,7 @@ def test_REQ_BOARD_symmetric_rotation_still_costs_a_move() -> None:
     assert board.tiles[Cell(0, 1)].ports == {N, E, S, W}
 
 
-def test_REQ_BOARD_solving_on_the_last_move_wins() -> None:
+def test_req_board_solving_on_the_last_move_wins() -> None:
     board = row_board(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP), budget=1)
     events = board.rotate(Cell(0, 1))
     assert board.moves_used == board.move_budget
@@ -205,35 +205,35 @@ def test_REQ_BOARD_solving_on_the_last_move_wins() -> None:
     assert isinstance(events[-1], BoardSolved)
 
 
-def test_REQ_BOARD_running_out_of_moves_exhausts_and_rejects() -> None:
+def test_req_board_running_out_of_moves_exhausts_and_rejects() -> None:
     board = row_board(tile("e", Role.SOURCE), tile("n"), tile("w", Role.LAMP), budget=2)
     assert len(board.rotate(Cell(0, 1))) == 1  # one event: not solved
     board.rotate(Cell(0, 1))
     assert board.state is BoardState.EXHAUSTED
     before = copy.deepcopy(board)
-    with pytest.raises(BoardFinished):
+    with pytest.raises(BoardFinishedError):
         board.rotate(Cell(0, 1))
     assert board == before
 
 
-def test_REQ_BOARD_invalid_commands_cost_nothing() -> None:
+def test_req_board_invalid_commands_cost_nothing() -> None:
     board = starter_board()
     before = copy.deepcopy(board)
     for cell in (Cell(0, 0), Cell(1, 2), Cell(2, 0), Cell(5, 5)):  # source, lamps, off the board
-        with pytest.raises(InvalidRotation):
+        with pytest.raises(InvalidRotationError):
             board.rotate(cell)
     sparse = Board(
         "sparse", 1, 3, {Cell(0, 0): tile("e", Role.SOURCE), Cell(0, 2): tile("w", Role.LAMP)}, 2
     )
-    with pytest.raises(InvalidRotation):
+    with pytest.raises(InvalidRotationError):
         sparse.rotate(Cell(0, 1))  # an empty cell
-    with pytest.raises(InvalidRotation):
+    with pytest.raises(InvalidRotationError):
         board.rotate((0, 1))  # type: ignore[arg-type]
     assert board == before
     assert sparse.moves_used == 0
 
 
-def test_REQ_BOARD_solved_event_only_on_the_first_transition() -> None:
+def test_req_board_solved_event_only_on_the_first_transition() -> None:
     board = starter_board()
     seen: list[object] = []
     for cell in (Cell(0, 1), Cell(0, 2), Cell(0, 2), Cell(1, 1)):
@@ -244,7 +244,7 @@ def test_REQ_BOARD_solved_event_only_on_the_first_transition() -> None:
     assert [event.move for event in seen if isinstance(event, TileRotated)] == [1, 2, 3, 4]
 
 
-def test_REQ_BOARD_starter_needs_four_rotations_found_by_search() -> None:
+def test_req_board_starter_needs_four_rotations_found_by_search() -> None:
     board = starter_board()
     assert board.state is BoardState.ACTIVE
     assert board.powered == {Cell(0, 0)}
@@ -263,7 +263,7 @@ def test_REQ_BOARD_starter_needs_four_rotations_found_by_search() -> None:
     assert starter_board("other").board_id == "other"
 
 
-def test_REQ_BOARD_same_commands_give_the_same_board() -> None:
+def test_req_board_same_commands_give_the_same_board() -> None:
     plays = []
     for _ in range(2):
         board = starter_board()

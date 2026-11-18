@@ -16,12 +16,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from circuit_shift.domain import (  # noqa: E402
     Board,
-    BoardFinished,
+    BoardFinishedError,
     BoardSolved,
     BoardState,
     Cell,
     Connectivity,
-    InvalidRotation,
+    InvalidRotationError,
     Orientation,
     Port,
     Role,
@@ -405,11 +405,11 @@ def main() -> None:
     try:
         spent.rotate(Cell(0, 1))
         kept = 0
-    except BoardFinished:
+    except BoardFinishedError:
         kept = 1
     value(
         "terminal-refuses",
-        "a rotation on an exhausted board raises BoardFinished (theory 1)",
+        "a rotation on an exhausted board raises BoardFinishedError (theory 1)",
         kept,
         1,
     )
@@ -424,7 +424,7 @@ def main() -> None:
     for cell in (Cell(0, 0), Cell(1, 2), Cell(2, 0), Cell(7, 7)):
         try:
             fresh.rotate(cell)
-        except InvalidRotation:
+        except InvalidRotationError:
             refused += 1
     value(
         "invalid-refused",
