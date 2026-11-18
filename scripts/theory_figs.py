@@ -11,10 +11,7 @@ from collections import Counter, deque
 from itertools import product
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
-
-from circuit_shift.domain import (  # noqa: E402
+from circuit_shift.domain import (
     Board,
     BoardFinishedError,
     BoardSolved,
@@ -31,6 +28,7 @@ from circuit_shift.domain import (  # noqa: E402
     tile,
 )
 
+ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs/theory/figures"
 ROWS: list[str] = []
 SIZE = 78
@@ -38,22 +36,25 @@ END = {Port.NORTH: (0.5, 0.0), Port.EAST: (1.0, 0.5), Port.SOUTH: (0.5, 1.0), Po
 
 
 def value(key: str, what: str, measured: float, theory: float) -> None:
-    """One row of the table: id | what | measured | theory | error (absolute when theory is 0)."""
+    """Add one row: id | what | measured | theory | error (absolute when theory is 0)."""
     error = abs(measured / theory - 1) if theory else abs(measured - theory)
     ROWS.append(f"| `{key}` | {what} | {measured:.8g} | {theory:.8g} | {error:.2e} |")
 
 
 def draw(
-    tiles: dict[Cell, Tile], rows: int, cols: int, x0: float, y0: float, caption: str
+    tiles: dict[Cell, Tile], shape: tuple[int, int], at: tuple[float, float], caption: str
 ) -> list[str]:
-    """One board: wires as lines from the centre to each port; powered tiles in colour."""
+    """Draw one board of `shape` (rows, cols) at `at` (x, y); powered tiles in colour."""
+    rows, cols = shape
+    x0, y0 = at
     powered = Connectivity.powered(tiles)
     out = [f'<text x="{x0}" y="{y0 - 10}" fill="#222">{caption}</text>']
     for row in range(rows):
         for col in range(cols):
             x, y = x0 + col * SIZE, y0 + row * SIZE
             out.append(
-                f'<rect x="{x}" y="{y}" width="{SIZE - 4}" height="{SIZE - 4}" fill="#f4f4f4" stroke="#cccccc"/>'
+                f'<rect x="{x}" y="{y}" width="{SIZE - 4}" height="{SIZE - 4}" fill="#f4f4f4" '
+                'stroke="#cccccc"/>'
             )
             cell = Cell(row, col)
             piece = tiles.get(cell)
@@ -64,22 +65,28 @@ def draw(
             for port in piece.ports:
                 ex, ey = END[port]
                 out.append(
-                    f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{x + ex * (SIZE - 4):.1f}" y2="{y + ey * (SIZE - 4):.1f}" stroke="{colour}" stroke-width="8" stroke-linecap="round"/>'
+                    f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{x + ex * (SIZE - 4):.1f}" '
+                    f'y2="{y + ey * (SIZE - 4):.1f}" stroke="{colour}" stroke-width="8" '
+                    'stroke-linecap="round"/>'
                 )
             if piece.role is Role.SOURCE:
                 out.append(
-                    f'<rect x="{cx - 13:.1f}" y="{cy - 13:.1f}" width="26" height="26" fill="#1f77b4"/>'
+                    f'<rect x="{cx - 13:.1f}" y="{cy - 13:.1f}" width="26" height="26" '
+                    'fill="#1f77b4"/>'
                 )
                 out.append(
-                    f'<text x="{cx:.1f}" y="{cy + 4:.1f}" text-anchor="middle" fill="#ffffff" font-size="11">S</text>'
+                    f'<text x="{cx:.1f}" y="{cy + 4:.1f}" text-anchor="middle" fill="#ffffff" '
+                    'font-size="11">S</text>'
                 )
             elif piece.role is Role.LAMP:
                 fill = "#ffd43b" if cell in powered else "#ffffff"
                 out.append(
-                    f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="14" fill="{fill}" stroke="#333333" stroke-width="2"/>'
+                    f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="14" fill="{fill}" stroke="#333333" '
+                    'stroke-width="2"/>'
                 )
                 out.append(
-                    f'<text x="{cx:.1f}" y="{cy + 4:.1f}" text-anchor="middle" fill="#333333" font-size="11">L</text>'
+                    f'<text x="{cx:.1f}" y="{cy + 4:.1f}" text-anchor="middle" fill="#333333" '
+                    'font-size="11">L</text>'
                 )
             else:
                 out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="{colour}"/>')
@@ -114,14 +121,17 @@ def bars(name: str, heading: str, labels: list[str], heights: list[int]) -> None
         bar_h = h / peak * plot_h
         x = left + i * step + step * 0.15
         out.append(
-            f'<rect x="{x:.1f}" y="{top + plot_h - bar_h:.1f}" width="{step * 0.7:.1f}" height="{bar_h:.1f}" fill="#1f77b4"/>'
+            f'<rect x="{x:.1f}" y="{top + plot_h - bar_h:.1f}" width="{step * 0.7:.1f}" '
+            f'height="{bar_h:.1f}" fill="#1f77b4"/>'
         )
         middle = left + i * step + step / 2
         out.append(
-            f'<text x="{middle:.1f}" y="{top + plot_h - bar_h - 4:.1f}" text-anchor="middle" fill="#222">{h}</text>'
+            f'<text x="{middle:.1f}" y="{top + plot_h - bar_h - 4:.1f}" text-anchor="middle" '
+            f'fill="#222">{h}</text>'
         )
         out.append(
-            f'<text x="{middle:.1f}" y="{top + plot_h + 18}" text-anchor="middle" fill="#444">{text}</text>'
+            f'<text x="{middle:.1f}" y="{top + plot_h + 18}" text-anchor="middle" '
+            f'fill="#444">{text}</text>'
         )
     out.append(
         f'<rect x="{left}" y="{top}" width="{plot_w}" height="{plot_h}" fill="none" stroke="#888"/>'
@@ -129,10 +139,8 @@ def bars(name: str, heading: str, labels: list[str], heights: list[int]) -> None
     svg(name, width, height, out)
 
 
-def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
-
-    # S02: the four orientations of a corner, a bar and a T
+def orientation_values() -> None:
+    """S02: the four orientations of a corner, a bar and a T."""
     body = [title("Clockwise quarter-turns: orientation 0, 1, 2, 3")]
     for r, (shape, name) in enumerate((("ne", "corner"), ("ns", "bar"), ("nes", "T"))):
         for turns in range(4):
@@ -140,10 +148,8 @@ def main() -> None:
             ports = " ".join(sorted(port.value[0] for port in piece.ports))
             body += draw(
                 {Cell(0, 0): piece},
-                1,
-                1,
-                30 + turns * 150,
-                70 + r * 120,
+                (1, 1),
+                (30 + turns * 150, 70 + r * 120),
                 f"{name}, {turns}: {ports}",
             )
     svg("orientations.svg", 640, 420, body)
@@ -194,7 +200,9 @@ def main() -> None:
         4,
     )
 
-    # S03: connections
+
+def connection_values() -> None:
+    """S03: connections."""
     examples = [
         (
             row_tiles(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP)),
@@ -216,7 +224,7 @@ def main() -> None:
     body = [title("A connection needs facing ports on both tiles")]
     lit = []
     for i, (tiles, caption) in enumerate(examples):
-        body += draw(tiles, 1, 3, 30 + (i % 2) * 330, 70 + (i // 2) * 130, caption)
+        body += draw(tiles, (1, 3), (30 + (i % 2) * 330, 70 + (i // 2) * 130), caption)
         lit.append(Cell(0, 2) in Connectivity.powered(tiles))
     svg("connections.svg", 700, 320, body)
     value(
@@ -251,8 +259,8 @@ def main() -> None:
         Cell(0, 3): tile("w", Role.LAMP),
     }
     body = [title("A cycle with dangling ports, and a pair away from the source")]
-    body += draw(loop, 2, 3, 30, 70, "a powered loop; the lamp faces north")
-    body += draw(island, 1, 4, 340, 70, "lamp joined to a wire, not to the source")
+    body += draw(loop, (2, 3), (30, 70), "a powered loop; the lamp faces north")
+    body += draw(island, (1, 4), (340, 70), "lamp joined to a wire, not to the source")
     svg("graph.svg", 700, 250, body)
     value(
         "connect-cycle",
@@ -262,21 +270,24 @@ def main() -> None:
     )
     value(
         "connect-island",
-        "tiles powered when a connected wire-lamp pair is not joined to the source (theory 1: the source only)",
+        "tiles powered when a connected wire-lamp pair is not joined to the source (theory 1: the "
+        "source only)",
         len(Connectivity.powered(island)),
         1,
     )
 
-    # S04, S06: the starter board
+
+def starter_values() -> None:
+    """S04, S06: the starter board, every combination of orientations, and the shortest play."""
     board = starter_board()
     wires = [cell for cell, piece in board.tiles.items() if piece.role is Role.WIRE]
     body = [title("The starter board before and after its four rotations")]
-    body += draw(board.tiles, 3, 3, 30, 70, "start: only the source is powered")
+    body += draw(board.tiles, (3, 3), (30, 70), "start: only the source is powered")
     solved = starter_board()
     events: list[object] = []
     for cell in (Cell(0, 1), Cell(0, 2), Cell(0, 2), Cell(1, 1)):
         events.extend(solved.rotate(cell))
-    body += draw(solved.tiles, 3, 3, 330, 70, "after 4 of 6 moves: both lamps powered")
+    body += draw(solved.tiles, (3, 3), (330, 70), "after 4 of 6 moves: both lamps powered")
     svg("starter.svg", 600, 330, body)
     value(
         "starter-wires",
@@ -314,8 +325,12 @@ def main() -> None:
         [e.move for e in events if isinstance(e, TileRotated)] == [1, 2, 3, 4],
         1,
     )
+    cost = combination_values(board, wires)
+    shortest_play_value(wires, cost)
 
-    # every combination of orientations: which solve it, and at what cost
+
+def combination_values(board: Board, wires: list[Cell]) -> Counter[int]:
+    """Try every combination of orientations: which solve the board, and at what cost."""
     cost: Counter[int] = Counter()
     combos = 0
     for combo in product(range(4), repeat=len(wires)):
@@ -347,8 +362,11 @@ def main() -> None:
         [str(k) for k in ks],
         [cost.get(k, 0) for k in ks],
     )
+    return cost
 
-    # breadth-first search over play itself: the shortest sequence of legal rotations
+
+def shortest_play_value(wires: list[Cell], cost: Counter[int]) -> None:
+    """Search play itself breadth-first for the shortest sequence of legal rotations."""
     start = starter_board()
     seen = {
         tuple(sorted((c.row, c.col, t.orientation.quarter_turns) for c, t in start.tiles.items()))
@@ -375,12 +393,15 @@ def main() -> None:
                 queue.append(((*path, cell), depth + 1))
     value(
         "starter-shortest-play",
-        "shortest sequence of legal rotations that solves the board, by breadth-first search through the aggregate (the same as the minimum above)",
+        "shortest sequence of legal rotations that solves the board, by breadth-first search "
+        "through the aggregate (the same as the minimum above)",
         shortest,
         min(cost),
     )
 
-    # S05: budget and terminal states
+
+def budget_values() -> None:
+    """S05: budget and terminal states."""
     last = Board(
         "last", 1, 3, row_tiles(tile("e", Role.SOURCE), tile("ns"), tile("w", Role.LAMP)), 1
     )
@@ -428,7 +449,8 @@ def main() -> None:
             refused += 1
     value(
         "invalid-refused",
-        "rotations of the source, the two lamps and a cell off the board that are refused (theory 4)",
+        "rotations of the source, the two lamps and a cell off the board that are refused (theory "
+        "4)",
         refused,
         4,
     )
@@ -448,16 +470,31 @@ def main() -> None:
             malformed += 1
     value(
         "board-rejected",
-        "malformed boards refused: no source, two sources, no lamp, zero budget, a tile off the board (theory 5)",
+        "malformed boards refused: no source, two sources, no lamp, zero budget, a tile off the "
+        "board (theory 5)",
         malformed,
         5,
     )
 
+
+def main() -> None:
+    """Write every figure and the measured-values table."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    orientation_values()
+    connection_values()
+    starter_values()
+    budget_values()
     lines = [
         "# Measured values",
         "",
-        "Written by `make theory-figs` (scripts/theory_figs.py) from the domain itself. Do not edit by hand.",
-        "The last column is the relative error; where the theory column is 0 it is the absolute value.",
+        (
+            "Written by `make theory-figs` (scripts/theory_figs.py) from the domain itself. Do not "
+            "edit by hand."
+        ),
+        (
+            "The last column is the relative error; where the theory column is 0 it is the "
+            "absolute value."
+        ),
         "",
         "| id | what is measured | measured | theory | error |",
         "|---|---|---|---|---|",
